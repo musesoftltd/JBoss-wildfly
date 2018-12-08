@@ -164,12 +164,15 @@ def isServerRunning(servername, username, password):
         if (result.success) : 
             response = result.getResponse() 
             serverstate = response.get("result").asString()
+            print 'Server: ' + servername + 'is Running.'
             print "Current server state: " + serverstate
             
             nonUnicodeServerState = str(serverstate)
             if (nonUnicodeServerState == "running"):
+                print 'isServerRunning()... YES'
                 returnResult = True            
     else :
+        print 'isServerRunning()... NO'
         returnResult = False
         
     if (cliConnected != None) : cliConnected.disconnect()
@@ -340,10 +343,20 @@ def stopServerConnected(cliConnected):
 
 def issueCliCommandConnected(cli, command):
     try :
+        print ' issuing cli commmand ->' + command + '<- ...'
         cli.cmd(command)
-        if (cli.success) :  #
-            cmdResult = True
+        cmdResult = True
+        print ' issuing cli commmand ->' + command + '<- ...end'
     except :
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        print "*** print_tb:"
+        traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+        print "*** print_exception:"
+        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
+        print "*** format_exc, first and last line:"
+        formatted_lines = traceback.format_exc().splitlines()
+        print formatted_lines[0]
+        print formatted_lines[-1]
         cmdResult = False
     
     return cmdResult
@@ -352,14 +365,10 @@ def issueCliCommand(servername, username, password, command):
     cliConnected = connectSilent(servername, username, password)
 
     cmdResult = None
-       
-    try :
-        if (cliConnected != None) :
-            cliConnected.cmd(command)
-            if (cliConnected.success) :
-                cmdResult = True
-    except :
-            None
+    
+    print 'On Server :' + servername + ' issuing ->' + command + '<- ...' 
+    issueCliCommandConnected(cliConnected, command)
+    print 'On Server :' + servername + ' issuing ->' + command + '<- ...end.' 
                
     return cmdResult
  
@@ -370,6 +379,7 @@ def getParameterValue(servername, username, password, cliVector, cliProperty, re
     cliConnected = None
     currentValue = ''
     cliResult = None
+    cliCmd = ''
 
     if (reloadServerIfRequired) :    
         if isServerReloadRequired(servername, username, password):
@@ -385,8 +395,8 @@ def getParameterValue(servername, username, password, cliVector, cliProperty, re
                     dealingWithADatasource = False
                     dealingWithAnXaDatasource = False
                     # check for regular datasource...
-                    datasourceName = regularExpressionSearch("/subsystem=datasources/data-source=(.*)/", cliVector)
-                    xaDatasourceName = regularExpressionSearch("/subsystem=datasources/xa-data-source=(.*)/", cliVector)
+                    datasourceName = regularExpressionSearch("/subsystem=datasources/data-source=(.*)", cliVector)
+                    xaDatasourceName = regularExpressionSearch("/subsystem=datasources/xa-data-source=(.*)", cliVector)
                                 
                     if (datasourceName != '') :
                         # then we are dealing with a datsource.
@@ -448,9 +458,14 @@ def getParameterValue(servername, username, password, cliVector, cliProperty, re
 def setParameterValue(servername, username, password, cliVector, cliProperty, targetValue, reloadServerIfRequired=False):
     cliConnected = None
     appliedOk = False
+    cliCmd = ''
     
     print 'On Server :' + servername + ' applying ->' + cliProperty + '<- from CLI Vector ->' + cliVector + '<- ...'
     try:
+        if (reloadServerIfRequired) :    
+            if isServerReloadRequired(servername, username, password):
+                reloadServerThenWait(servername, username, password)
+        
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None):
             dealingWithADatasource = False
@@ -625,7 +640,7 @@ def applySecurity(servername, username, password, keyStorePassword, keyStoreAlia
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None) :
             print 'Remove Default HTTP/S Connector(s)...'
-            cliConnected.cmd('/subsystem=web/connector=http/:remove')
+#             cliConnected.cmd('/subsystem=web/connector=http/:remove')
             cliConnected.cmd('/subsystem=web/connector=https/:remove')
             print 'Remove Default HTTP/S Connector(s)...end.'
                     
@@ -655,8 +670,9 @@ def applySecurity(servername, username, password, keyStorePassword, keyStoreAlia
             cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=certificate-key-file,value=' + keyStoreFile + ')')
             cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=name,value=SSLConfig)')
             cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=password,value=' + keyStorePassword + ')')
-            cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=protocol,value=TLSv1)')
+            cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=protocol,value=TLSv1.1,TLSv1.2)')
             cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=key-alias,value=' + keyStoreAlias + ')')
+            cliConnected.cmd('/subsystem=web/connector=https/configuration=ssl/:write-attribute(name=cipher-suite,value=ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256")')            
             print 'Adding SSL Connector Detail...end.'      
         
     except:
@@ -728,10 +744,23 @@ def applyCustomLogger(servername, username, password):
                 result = cliConnected.cmd("/subsystem=logging/root-logger=ROOT/:remove-handler(name=FILE)")
                 if result.success == True:
                     print 'ROOT Logger, FILE handler removed'
+
+                result = cliConnected.cmd("/subsystem=logging/root-logger=ROOT/:remove-handler(name=ASYNC)")
+                if result.success == True:
+                    print 'ASYNC Logger, removed'
                     
                 result = cliConnected.cmd("/subsystem=logging/root-logger=ROOT/:add-handler(name=FILESIZEDATE)")
                 if result.success == True:
                     print 'ROOT Logger, FILESIZEDATE added'
+                    
+                result = cliConnected.cmd("/subsystem=logging/console-handler=CONSOLE/:write-attribute(name=level,value=WARN)")
+                if result.success == True:
+                    print 'Console Logger, level to WARN'
+
+                result = cliConnected.cmd("/subsystem=logging/root-logger=ROOT/:write-attribute(name=level,value=WARN)")
+                if result.success == True:
+                    print 'ROOT Logger, level to WARN'
+                    
             except : 
                 print 'Adding Logger for server: ' + servername + ' FAILED: '
     except:
@@ -822,7 +851,7 @@ def disableDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None):
-            result = cliConnected.cmd('/subsystem=datasources/data-source=' + dsName + '/:disable')
+            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':disable')
             if result.success == True:
                 print dsName + ' was stopped on the server'
             else:
@@ -841,7 +870,7 @@ def disableXaDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None):
-            result = cliConnected.cmd('/subsystem=xa-datasources/data-source=' + dsName + '/:disable')
+            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':disable')
             if result.success == True:
                 print dsName + ' was stopped on the server'
             else:
@@ -861,7 +890,7 @@ def enableDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None) :
-            result = cliConnected.cmd('/subsystem=datasources/data-source=' + dsName + '/:enable')
+            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':enable')
             if result.success == True:
                 print dsName + ' was started on the server'
             else:
@@ -881,7 +910,7 @@ def enableXaDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None) :
-            result = cliConnected.cmd('/subsystem=xa-datasources/data-source=' + dsName + '/:enable')
+            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':enable')
             if result.success == True:
                 print dsName + ' was started on the server'
             else:
@@ -1439,18 +1468,18 @@ def setAsyncConnectionFactoryPoolSize(servername, username, password, poolSizeMi
     setParameterValue(servername, username, password, "/subsystem=messaging/hornetq-server=default/pooled-connection-factory=AsyncConnectionFactory/", "max-pool-size", poolSizeMax)
     print 'setting AsyncConnectionFactoryPoolSize...end.'
     
-def convertSha1SumToJbossCliHash(appVer):
+def convertSha1SumToJbossCliHash(sha1sum):
     index = 0
-    strLenAppVer = len(appVer)
+    strLenSha1sum = len(sha1sum)
     cliHash = ''
     
     cliHash = cliHash + '[{\"hash\" => bytes {'
-    while index < strLenAppVer :
+    while index < strLenSha1sum :
         if (index) % 2 == 0 :
-            cliHash = cliHash + ' 0x' + appVer[index]
+            cliHash = cliHash + ' 0x' + sha1sum[index]
         else :
-            cliHash = cliHash + appVer[index]
-            if not(index + 1 == strLenAppVer) :
+            cliHash = cliHash + sha1sum[index]
+            if not(index + 1 == strLenSha1sum) :
                 cliHash = cliHash + ','
 
         index = index + 1            
@@ -1458,3 +1487,270 @@ def convertSha1SumToJbossCliHash(appVer):
     cliHash = cliHash + ' }}]'
     
     return cliHash
+
+def perfEnrichXAOracleDatasource(servername, username, password):
+    print 'perfEnrichXADatasource...'
+    
+    dsList=getAllXaDataSources(servername, username, password)
+    if (dsList) :
+        for dsName in dsList:
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+                
+            cliVector = sanitizeJDBCCliVector("/subsystem=datasources/xa-data-source=" + dsName)
+            
+            issueCliCommand(servername, username, password, cliVector + ':disable')
+
+            dsUsername = getParameterValue(servername, username, password, cliVector, "user-name")
+            dsPassword = getParameterValue(servername, username, password, cliVector, "password")
+            dsURL = getParameterValue(servername, username, password, cliVector + "xa-datasource-properties=URL/", "value")
+            
+            disableXaDatasource(servername, username, password, dsName)
+            issueCliCommand(servername, username, password, cliVector + ':remove')
+            
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+
+            issueCliCommand(servername, username, password, cliVector +
+                ":add(user-name=" + dsUsername + ',' +
+                "password=" + dsPassword + ',' +
+                "spy=false, \
+                wrap-xa-resource=true, \
+                max-pool-size=20, \
+                set-tx-query-timeout=false, \
+                enabled=false, \
+                same-rm-override=false, \
+                statistics-enabled=true, \
+                pool-use-strict-min=false, \
+                validate-on-match=false, \
+                no-recovery=false, \
+                track-statements=NOWARN, \
+                no-tx-separate-pool=false, \
+                use-fast-fail=false, \
+                flush-strategy=FailingConnectionOnly, \
+                interleaving=false, \
+                allow-multiple-users=false, \
+                background-validation=true, \
+                BackgroundValidationMillis=60000, \
+                use-ccm=true, \
+                use-java-context=true, \
+                use-fast-fail=true, \
+                min-pool-size=5, \
+                max-pool-size=100, \
+                pad-xid=false, \
+                pool-prefill=false, \
+                share-prepared-statements=false, \
+                exception-sorter-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleExceptionSorter\", \
+                TrackStatements=NOWARN, \
+                check-valid-connection-sql=\"select 1 from dual\", \
+                valid-connection-checker-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker\", \
+                flush-strategy=FailingConnectionOnly, \
+                idle-timeout-minutes=5, \
+                blocking-timeout-wait-millis=90000, \
+                pool-prefill=false, \
+                jndi-name=java:jboss/datasources/" + dsName + ',' +
+                "driver-name=\"com.informatica.mdm.jdbc\")")
+ 
+            issueCliCommand(servername, username, password, sanitizeJDBCCliVector("/subsystem=datasources/xa-data-source=" + dsName + "/xa-datasource-properties=URL/") + ":add(value=" + dsURL + ')')
+            issueCliCommand(servername, username, password, sanitizeJDBCCliVector("/subsystem=datasources/xa-data-source=" + dsName + "/xa-datasource-properties=ConnectionProperties/") + ':add(value=\"oracle.jdbc.J2EE13Compliant=true\")')
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+            
+            enableXaDatasource(servername, username, password, dsName)                
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+    else :
+        print '    no xa datasources found...'
+        
+    print 'perfEnrichXADatasource...end.'
+
+def perfEnrichOracleDatasource(servername, username, password):
+    print 'perfEnrichDatasource...'
+    
+    dsList=getAllDataSources(servername, username, password)
+    if (dsList) :
+        for dsName in dsList:
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+                
+            cliVector = sanitizeJDBCCliVector("/subsystem=datasources/data-source=" + dsName)
+            
+            issueCliCommand(servername, username, password, cliVector + ':disable')
+
+            dsUsername = getParameterValue(servername, username, password, cliVector, "user-name")
+            dsPassword = getParameterValue(servername, username, password, cliVector, "password")
+            dsURL = getParameterValue(servername, username, password, cliVector + "datasource-properties=URL/", "value")
+            
+            disableDatasource(servername, username, password, dsName)
+            issueCliCommand(servername, username, password, cliVector + ':remove')
+            
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+
+            issueCliCommand(servername, username, password, cliVector +
+                ":add(user-name=" + dsUsername + ',' +
+                "password=" + dsPassword + ',' +
+                "spy=false, \
+                set-tx-query-timeout=false, \
+                enabled=false, \
+                same-rm-override=false, \
+                statistics-enabled=true, \
+                pool-use-strict-min=false, \
+                validate-on-match=false, \
+                no-recovery=false, \
+                track-statements=NOWARN, \
+                no-tx-separate-pool=false, \
+                use-fast-fail=false, \
+                flush-strategy=FailingConnectionOnly, \
+                interleaving=false, \
+                allow-multiple-users=false, \
+                background-validation=true, \
+                BackgroundValidationMillis=60000, \
+                use-ccm=true, \
+                use-java-context=true, \
+                use-fast-fail=true, \
+                min-pool-size=5, \
+                max-pool-size=100, \
+                pad-xid=false, \
+                pool-prefill=false, \
+                share-prepared-statements=false, \
+                exception-sorter-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleExceptionSorter\", \
+                TrackStatements=NOWARN, \
+                check-valid-connection-sql=\"select 1 from dual\", \
+                valid-connection-checker-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker\", \
+                flush-strategy=FailingConnectionOnly, \
+                idle-timeout-minutes=5, \
+                blocking-timeout-wait-millis=90000, \
+                pool-prefill=false, \
+                jndi-name=java:jboss/datasources/" + dsName + ',' +
+                "driver-name=\"oracle.jdbc.OracleDriver\")")
+ 
+            issueCliCommand(servername, username, password, sanitizeJDBCCliVector("/subsystem=datasources/data-source=" + dsName + "/xa-datasource-properties=URL/") + ":add(value=" + dsURL + ')')
+            issueCliCommand(servername, username, password, sanitizeJDBCCliVector("/subsystem=datasources/data-source=" + dsName + "/xa-datasource-properties=ConnectionProperties/") + ':add(value=\"oracle.jdbc.J2EE13Compliant=true\")')
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+            
+            enableDatasource(servername, username, password, dsName)                
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+    else :
+        print '    no datasources found...'
+        
+    print 'perfEnrichDatasource...end.'
+
+def perfEnrichDatasource(servername, username, password):
+    print 'perfEnrichDatasource...'
+    
+    dsList=getAllDataSources(servername, username, password)
+    if (dsList) :
+        for dsName in dsList:
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+                
+            cliVector = sanitizeJDBCCliVector("/subsystem=datasources/data-source=" + dsName)
+            
+            issueCliCommand(servername, username, password, cliVector + ':disable')
+
+            dsUsername = getParameterValue(servername, username, password, cliVector, "user-name")
+            dsPassword = getParameterValue(servername, username, password, cliVector, "password")
+            dsURL = getParameterValue(servername, username, password, cliVector + "datasource-properties=URL/", "value")
+            
+            disableDatasource(servername, username, password, dsName)
+            issueCliCommand(servername, username, password, cliVector + ':remove')
+            
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+
+            issueCliCommand(servername, username, password, cliVector +
+                ":add(user-name=" + dsUsername + ',' +
+                "password=" + dsPassword + ',' +
+                "spy=false, \
+                set-tx-query-timeout=false, \
+                enabled=false, \
+                same-rm-override=false, \
+                statistics-enabled=true, \
+                pool-use-strict-min=false, \
+                validate-on-match=false, \
+                no-recovery=false, \
+                track-statements=NOWARN, \
+                no-tx-separate-pool=false, \
+                use-fast-fail=false, \
+                flush-strategy=FailingConnectionOnly, \
+                interleaving=false, \
+                allow-multiple-users=false, \
+                background-validation=true, \
+                BackgroundValidationMillis=60000, \
+                use-ccm=true, \
+                use-java-context=true, \
+                use-fast-fail=true, \
+                min-pool-size=5, \
+                max-pool-size=100, \
+                pad-xid=false, \
+                pool-prefill=false, \
+                share-prepared-statements=false, \
+                exception-sorter-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleExceptionSorter\", \
+                TrackStatements=NOWARN, \
+                check-valid-connection-sql=\"select 1 from dual\", \
+                valid-connection-checker-class-name=\"org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker\", \
+                flush-strategy=FailingConnectionOnly, \
+                idle-timeout-minutes=5, \
+                blocking-timeout-wait-millis=90000, \
+                pool-prefill=false, \
+                jndi-name=java:jboss/datasources/" + dsName + ',' +
+                "driver-name=\"com.informatica.mdm.jdbc\")")
+ 
+            issueCliCommand(servername, username, password, sanitizeJDBCCliVector("/subsystem=datasources/data-source=" + dsName + "/xa-datasource-properties=URL/") + ":add(value=" + dsURL + ')')
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+            
+            enableDatasource(servername, username, password, dsName)                
+
+            if (isServerReloadRequired(servername, username, password)) :
+                reloadServerThenWait(servername, username, password)
+    else :
+        print '    no datasources found...'
+        
+    print 'perfEnrichDatasource...end.'
+
+def addDBDriver(servername, username, password, driverName, moduleName, driverClass):
+    print 'addDriver...'
+    issueCliCommand(servername, username, password, '/subsystem=datasources/jdbc-driver=' + driverName + '/:'
+        'add(driver-name=' + driverName +
+        ',driver-module-name=' + moduleName + 
+        ',driver-class-name=' + driverClass + ')')
+    print 'addDriver...end.'
+
+
+def addModule(servername, username, password,moduleName, resourceJars, dependancies):
+    print 'addModule...'
+    issueCliCommand(servername, username, password, 
+         "module add --name=" + moduleName +
+         " --resources=" + resourceJars +
+         " --dependencies=" + dependancies)
+    print 'addModule...end.'
+    
+def createDatasource(servername, username, password, jndiName, poolname, connectionUrl, drivername, driverClassName, dsUsername, dsPassword):        
+    print 'createDatasource...'
+        
+    issueCliCommand(servername, username, password, 
+        "/subsystem=datasources/data-source=" + poolname + "/:add(" + 
+        "jndi-name=" + jndiName + 
+        ",driver-name=" + drivername +
+        ',connection-url=\"' + connectionUrl + '\"' +
+        ",driver-class=" + driverClassName +
+        ",max-pool-size=20" +
+        ",min-pool-size=0" +
+        ",track-statements=NOWARN" +
+        ",flush-strategy=FailingConnectionOnly" +
+        ",statistics-enabled=true" +  
+        ",user-name=\"" + dsUsername + "\""
+        ",password=\"" + dsPassword + '\"' +  
+        ")")
+
+    print 'createDatasource...end.'
+
