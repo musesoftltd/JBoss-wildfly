@@ -3,14 +3,25 @@ Created on 14 Oct 2016
 
 @author: ...
 '''
+from StringIO import StringIO
 import errno
+from java.lang import System, StringBuilder
+from java.util import Properties
 import os
 import re
 from string import rsplit
+import sys
 from threading import Thread
+
+from com.jcraft.jsch import JSch
 
 
 scatterGatherThreadPool = []
+
+def addQuotes(stringToAugment):
+    newString = stringToAugment
+
+    return "\"" + newString + "\""
 
 def stripQuotes(stringToStrip):
     newString = stringToStrip
@@ -23,6 +34,19 @@ def stripQuotes(stringToStrip):
 
     return newString
 
+def stripCTRLChars(stringToStrip):
+    newString = ''
+ 
+    for char in stringToStrip:
+        if (char == '\n'):
+            newString = newString + ' | '
+        elif (char == ','):
+            newString = newString + ' | '
+        else :
+            newString = newString + char
+ 
+    return newString
+ 
 def checkThenAddQuotes(stringToCheck):
     newString = stringToCheck
 
@@ -182,22 +206,6 @@ def findReplaceIntoSameFile(stringToFind, stringToSet, fileName):
     with open(fileName, 'w') as file:
         file.write(filedata)
 
-# def ftpFile(username, password, hostname, fileToSend, remoteDir):
-#     import ftplib
-#     session = ftplib.FTP(hostname, username, password)
-#     if (remoteDir != ""): session.cwd(remoteDir)
-#     fileHandle = open(fileToSend,'rb') # file to send
-#     session.storbinary(fileToSend, fileHandle) # send the file
-#     file.close() # close file and FTP
-#     session.quit()
-#
-# def sftpFile (username, password, hostname, fileToSend, remoteDir):
-#     import pysftp
-#
-#     with pysftp.Connection(hostname, username, password) as sftp:
-#         with sftp.cd(remoteDir):             # temporarily chdir to public
-#             sftp.put(remoteDir + "\\" + fileToSend)  # upload file to public/ on remote
-
 def scatterThread(strThreadPoolId, targetMethod, args=None):
     thread = Thread(target=targetMethod, args=args)
     scatterGatherThreadPool.append(dict({strThreadPoolId: thread}))
@@ -215,3 +223,67 @@ def gatherThreads(strThreadPoolId):
     # Wait for all threads to complete
     for t in localThreadsList:
         t.join()
+
+def execSshRemote(hostname, username, identityFileFullPath, identityPassword, commandsSemiColonSeperated):
+    _hostname = hostname
+    _username = username
+    _identityPassword = identityPassword
+    _command = commandsSemiColonSeperated
+ 
+    jsch = JSch()
+    jsch.addIdentity(identityFileFullPath, _identityPassword)
+ 
+    session = jsch.getSession(_username, _hostname, 22)
+    config = Properties()
+    config.put("StrictHostKeyChecking", "no")
+    config.put("GSSAPIAuthentication", "no")
+    config.put("UnknownHostVerification", "no")
+    config.put("PreferredAuthentications", "publickey");
+    session.setConfig(config);
+ 
+    # session.setTimeout(100)
+ 
+    try:
+        session.connect()
+    except:
+        return 'None'
+ 
+    channel = session.openChannel("exec")
+    channel.setCommand(_command)
+ 
+    outputBuffer = StringBuilder();
+    errorBuffer = StringBuilder();
+ 
+    stdin = channel.getInputStream();
+    stdinExt = channel.getExtInputStream();
+ 
+    channel.connect();
+ 
+    while (1) :
+        n = stdin.read()
+        if n == -1:
+            break
+        if (chr(n) == '\n'):
+            outputBuffer.append('|')
+        elif (chr(n) == '\r'):
+            outputBuffer.append('|')
+        else :
+            outputBuffer.append(chr(n))
+
+    while (1) :
+        n = stdinExt.read()
+        if n == -1:
+            break
+        if (chr(n) == '\n'):
+            errorBuffer.append('|')
+        elif (chr(n) == '\r'):
+            errorBuffer.append('|')
+        else :
+            errorBuffer.append(chr(n))
+  
+    print "Command: " + _command
+    print "\toutput: " + outputBuffer.toString()
+ 
+    channel.disconnect();
+ 
+    return outputBuffer.toString()
