@@ -351,6 +351,9 @@ def execSshRemoteUsrPwd(hostname, username, password, commandsSemiColonSeperated
         else :
             outputBuffer.append(chr(n))
  
+    print "Command on: " + hostname + " : " + _command
+    print "\toutput: " + outputBuffer.toString()
+
     channel.disconnect();
  
     return outputBuffer.toString()
