@@ -1516,10 +1516,6 @@ def perfEnrichXAOracleDatasource(servername, username, password):
                 "password=" + dsPassword + ',' +
                 "spy=false, \
                 wrap-xa-resource=true, \
-<<<<<<< HEAD
-                max-pool-size=20, \
-=======
->>>>>>> branch 'master' of https://github.com/musesoftltd/JBoss-wildfly
                 set-tx-query-timeout=false, \
                 enabled=false, \
                 same-rm-override=false, \
