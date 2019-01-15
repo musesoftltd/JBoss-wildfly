@@ -7,6 +7,7 @@ rem A script for running jMissionControl with the remoting-jmx libraries on the 
 ECHO ... PLEASE SET JBOSS_HOME !
 rem set JBOSS_HOME=C:\dev\EAP-6.1.0\jboss-eap-6.1
 rem set JBOSS_HOME=C:\dev\wildfly-10.0.0.Final
+set JBOSS_HOME=C:\dev\jboss-eap-6.4.0\jboss-eap-6.4
 
 ECHO ... PLEASE SET JAVA_HOME !
 rem set JAVA_HOME=C:\Program Files\Java\jdk1.8.0_92
