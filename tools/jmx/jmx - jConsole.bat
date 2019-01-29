@@ -8,7 +8,7 @@ ECHO ... PLEASE SET JBOSS_HOME !
 rem set JBOSS_HOME=C:\dev\wildfly-10.0.0.Final
 
 ECHO ... PLEASE SET JAVA_HOME !
-set JAVA_HOME=C:\Progra~1\Java\jdk1.8.0_201
+set JAVA_HOME=C:\Program Files\Java\jdk1.8.0_201
 
 rem set trustStore Path
 set trustStorePath=..\..\keyStore.p12
