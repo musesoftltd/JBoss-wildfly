@@ -6,7 +6,6 @@
 # It can be safely ignored
 from __builtin__ import None
 from java.util import Date
-from sre_parse import isdigit
 from string import find
 import sys
 from time import sleep
