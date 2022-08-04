@@ -850,7 +850,8 @@ def disableDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None):
-            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':disable')
+            #result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':disable')
+            result = cliConnected.cmd('/subsystem=datasources/data-source=' + dsName + '/:write-attribute(name=enabled,value=false)')
             if result.success == True:
                 print dsName + ' was stopped on the server'
             else:
@@ -869,7 +870,8 @@ def disableXaDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None):
-            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':disable')
+            #result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':disable')
+            result = cliConnected.cmd('/subsystem=datasources/xa-data-source=' + dsName + '/:write-attribute(name=enabled,value=false)')
             if result.success == True:
                 print dsName + ' was stopped on the server'
             else:
@@ -889,7 +891,8 @@ def enableDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None) :
-            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':enable')
+            #result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/data-source=' + dsName) + ':enable')
+            result = cliConnected.cmd('/subsystem=datasources/data-source=' + dsName + '/:write-attribute(name=enabled,value=true)')
             if result.success == True:
                 print dsName + ' was started on the server'
             else:
@@ -909,7 +912,8 @@ def enableXaDatasource(servername, username, password, dsName):
     try:
         cliConnected = connectSilent(servername, username, password)
         if (cliConnected != None) :
-            result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':enable')
+            #result = cliConnected.cmd(sanitizeJDBCCliVector('/subsystem=datasources/xa-data-source=' + dsName) + ':enable')
+            result = cliConnected.cmd('/subsystem=datasources/xa-data-source=' + dsName + '/:write-attribute(name=enabled,value=true)')
             if result.success == True:
                 print dsName + ' was started on the server'
             else:
